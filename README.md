@@ -62,54 +62,82 @@ Most document storage solutions force you to trust a third party with your plain
 
 ## Architecture
 
-```mermaid
-graph TD
-    classDef layer fill:#f6f8fa,stroke:#d0d7de,stroke-width:2px;
-    classDef component fill:#ffffff,stroke:#1f2328,stroke-width:1px;
-    classDef active fill:#f1f8e9,stroke:#2e7d32,stroke-width:1.5px;
-    
-    Client([HTTP Client]) --> Mux[chi Router /v1]
+```<table style="width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: left;">
+  <thead>
+    <tr style="background-color: #f6f8fa;">
+      <th colspan="2" style="border: 1px solid #d0d7de; padding: 12px; font-size: 16px;">🏛️ Architecture Overview</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="2" style="border: 1px solid #d0d7de; padding: 12px;">
+        <strong>Handlers Layer</strong>
+        <ul>
+          <li><code>auth.go</code>: Registration, login, refresh, logout</li>
+          <li><code>upload.go</code>: Encrypted file upload (<code>POST /v1/docs/upload</code>)</li>
+          <li><code>download.go</code>: Streaming file download (<code>GET /v1/docs/:id/download</code>)</li>
+          <li><code>search.go</code>: Full-text metadata search (<code>GET /v1/docs/search</code>)</li>
+          <li><code>delete.go</code>: Secure file deletion (<code>DELETE /v1/docs/:id</code>)</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 50%; border: 1px solid #d0d7de; padding: 12px; vertical-align: top;">
+        <strong>Middleware</strong>
+        <ul>
+          <li>JWT Validation</li>
+          <li>Session & KEK Injection</li>
+        </ul>
+      </td>
+      <td style="width: 50%; border: 1px solid #d0d7de; padding: 12px; vertical-align: top;">
+        <strong>Config</strong>
+        <ul>
+          <li>YAML & .env Loader</li>
+          <li>Typed ParsedConfig Output</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="border: 1px solid #d0d7de; padding: 12px;">
+        <strong>Services Layer</strong>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+          <tr>
+            <td style="width: 33%; border: 1px solid #d0d7de; padding: 8px; vertical-align: top; background-color: #fafafa;">
+              <strong>🔑 crypto</strong>
+              <div style="font-size: 12px; color: #57606a; margin-top: 4px;">Argon2id, AES-GCM, Streaming Encryption</div>
+            </td>
+            <td style="width: 33%; border: 1px solid #d0d7de; padding: 8px; vertical-align: top; background-color: #fafafa;">
+              <strong>👤 auth</strong>
+              <div style="font-size: 12px; color: #57606a; margin-top: 4px;">SQLite UserStore, In-memory SessionStore</div>
+            </td>
+            <td style="width: 33%; border: 1px solid #d0d7de; padding: 8px; vertical-align: top; background-color: #fafafa;">
+              <strong>📝 metadata</strong>
+              <div style="font-size: 12px; color: #57606a; margin-top: 4px;">SQLite + FTS5, User-scoped Document CRUD</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="border: 1px solid #d0d7de; padding: 12px;">
+        <strong>Connectors Layer</strong>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+          <tr>
+            <td style="width: 50%; border: 1px solid #d0d7de; padding: 8px; vertical-align: top; background-color: #fafafa;">
+              <strong>💾 Local Storage</strong>
+              <div style="font-size: 12px; color: #57606a; margin-top: 4px;">Filesystem connector with streaming I/O</div>
+            </td>
+            <td style="width: 50%; border: 1px solid #d0d7de; padding: 8px; vertical-align: top; background-color: #fafafa; color: #8c959f;">
+              <strong>☁️ Cloud Storage (Planned)</strong>
+              <div style="font-size: 12px; color: #8c959f; margin-top: 4px;">Amazon S3, Google Cloud Storage, Google Drive</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
-    subgraph Handlers ["Handlers Layer (handlers/)"]
-        auth_h[auth.go: Register/Login/Logout]
-        upload_h[upload.go: Post Upload]
-        download_h[download.go: Get Download]
-        search_h[search.go: Get Search]
-        delete_h[delete.go: Delete File]
-    end
-
-    subgraph Middleware ["Middleware & Config (middleware/, config/)"]
-        auth_mw[Auth Middleware: JWT & Session Resolution]
-        cfg[Config Loader: YAML & .env]
-    end
-
-    subgraph Services ["Core Services (services/)"]
-        crypto_s[🔑 crypto: Argon2id KDF & AES-256-GCM]
-        auth_s[👤 auth: User Store & In-Memory Sessions]
-        meta_s[📝 metadata: SQLite + FTS5 Document Store]
-    end
-
-    subgraph Storage ["Storage Layer (connectors/)"]
-        conn_local[💾 local: Filesystem Storage Connector]
-        conn_cloud[☁️ cloud: S3/GCS/Drive Connector - Planned]
-    end
-
-    Mux -->|"/v1/auth/*"| auth_h
-    Mux -->|"/v1/docs/*"| auth_mw
-    auth_mw -->|Authenticated Context: UserID & KEK| upload_h & download_h & search_h & delete_h
-
-    auth_h -->|Read/Write Credentials| auth_s
-    auth_h -->|Derive KEK via Argon2id| crypto_s
-    
-    upload_h & download_h & delete_h -->|CRUD Metadata & FTS5| meta_s
-    upload_h & download_h & delete_h -->|Read/Write Encrypted Files| conn_local
-    
-    upload_h & download_h -->|Encrypt/Decrypt Stream| crypto_s
-
-    class Handlers,Middleware,Services,Storage layer;
-    class auth_h,upload_h,download_h,search_h,delete_h,auth_mw,cfg,crypto_s,auth_s,meta_s,conn_local,conn_cloud component;
-    class auth_mw,crypto_s,auth_s,meta_s,conn_local active;
-```
 
 ---
 
