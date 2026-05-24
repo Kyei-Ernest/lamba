@@ -117,38 +117,42 @@ graph TD
 
 DocOps uses **two-layer envelope encryption** so that compromising any single component does not expose plaintext documents:
 
-```mermaid
-graph TD
-    subgraph Key_Derivation ["1. Key Derivation (At Login)"]
-        Pwd[User Password] -->|Argon2id KDF| KEK[Key Encrypting Key - KEK]
-        style KEK fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
-    end
-
-    subgraph Envelope_Encryption ["2. Envelope Encryption (At Upload)"]
-        PlainFile[Plaintext Document] -->|AES-256-GCM Streaming| EncFile[Encrypted File Content]
-        style PlainFile fill:#fff3e0,stroke:#ffb74d,stroke-width:1px;
-        style EncFile fill:#ffe0b2,stroke:#ffa726,stroke-width:1px;
-        
-        DEK[random 256-bit DEK] -->|Encrypts File| PlainFile
-        style DEK fill:#fff8e1,stroke:#ffb300,stroke-width:2px;
-        
-        KEK -->|AES-256-GCM Wrap| EncDEK[Encrypted DEK]
-        DEK -->|Wrapped by KEK| EncDEK
-        style EncDEK fill:#e3f2fd,stroke:#2196f3,stroke-width:1px;
-    end
-
-    subgraph Persistence ["3. Storage & Persistence"]
-        EncDEK -->|Stored in Metadata DB| DB[(SQLite Database)]
-        EncFile -->|Stored in Disk| Disk[Physical Storage / Disk]
-        style DB fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px;
-        style Disk fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px;
-    end
-
-    subgraph Mem ["Memory Boundary"]
-        KEK
-    end
-    style Mem fill:#fafdfa,stroke:#c8e6c9,stroke-dasharray: 5 5;
-```
+<div style="border: 1px solid #d0d7de; border-radius: 6px; padding: 16px; font-family: sans-serif; background-color: #f6f8fa; margin: 16px 0;">
+  <table style="width: 100%; border-collapse: collapse; text-align: center;">
+    <tr>
+      <td style="width: 25%; padding: 8px; border: 1px solid #d0d7de; background-color: #ffffff; border-radius: 4px;">
+        <strong>User Password</strong>
+      </td>
+      <td style="width: 10%; font-size: 20px; color: #57606a;">➔</td>
+      <td style="width: 25%; padding: 8px; border: 1px solid #d0d7de; background-color: #ffffff; border-radius: 4px;">
+        <strong>Argon2id KDF</strong>
+      </td>
+      <td style="width: 10%; font-size: 20px; color: #57606a;">➔</td>
+      <td style="width: 30%; padding: 8px; border: 1px solid #d0d7de; background-color: #e8f5e9; border-radius: 4px;">
+        <strong>Key Encrypting Key (KEK)</strong>
+        <div style="font-size: 11px; color: #2e7d32; margin-top: 4px;">In-memory only, never persisted</div>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="4" style="height: 20px;"></td>
+      <td style="font-size: 20px; color: #57606a;">⬇</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding: 8px; border: 1px solid #d0d7de; background-color: #fff8e1; border-radius: 4px; text-align: left; font-size: 13px;">
+        <strong>Per-Document Key (DEK)</strong>
+        <div style="font-size: 11px; color: #b78103; margin-top: 4px;">Random 256-bit key per document</div>
+      </td>
+      <td style="font-size: 20px; color: #57606a;">➔</td>
+      <td colspan="2" style="padding: 12px; border: 1px solid #d0d7de; background-color: #e3f2fd; border-radius: 4px; text-align: left;">
+        <strong>DEK Encryption Flow</strong>
+        <div style="font-size: 12px; margin-top: 4px; color: #0d47a1;">
+          • Encrypted DEK is stored in SQLite Database<br>
+          • Encrypted File Content is saved via the Storage Connector
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
 
 | Property | Guarantee |
 |:---|:---|
