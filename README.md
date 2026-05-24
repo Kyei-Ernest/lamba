@@ -63,52 +63,87 @@ Most document storage solutions force you to trust a third party with your plain
 ## Architecture
 
 ```mermaid
-graph TD
-    classDef layer fill:#f6f8fa,stroke:#d0d7de,stroke-width:2px;
-    classDef component fill:#ffffff,stroke:#1f2328,stroke-width:1px;
-    classDef active fill:#f1f8e9,stroke:#2e7d32,stroke-width:1.5px;
+graph LR
+    %% Custom styles for gorgeous look
+    classDef client fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a;
+    classDef router fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#1e1b4b;
+    classDef middleware fill:#fdf2f8,stroke:#db2777,stroke-width:2px,color:#500724;
+    classDef handler fill:#faf5ff,stroke:#9333ea,stroke-width:2px,color:#3b0764;
+    classDef service fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    classDef storage fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#7c2d12;
+    classDef inactive fill:#fafafa,stroke:#d4d4d8,stroke-width:1px,color:#71717a,stroke-dasharray: 5 5;
+
+    %% Nodes
+    Client([🌐 Web / HTTP Client])
     
-    Client([HTTP Client]) --> Mux[chi Router /v1]
-
-    subgraph Handlers ["Handlers Layer (handlers/)"]
-        auth_h[auth.go: Register/Login/Logout]
-        upload_h[upload.go: Post Upload]
-        download_h[download.go: Get Download]
-        search_h[search.go: Get Search]
-        delete_h[delete.go: Delete File]
+    subgraph Routing ["1. Entry & Routing"]
+        Mux["🛡️ Chi Router (main.go)"]
+    end
+    
+    subgraph Auth_MW ["2. Authentication Middleware"]
+        auth_mw["🔑 Auth Middleware<br/>(middleware/auth.go)"]
+    end
+    
+    subgraph Handlers ["3. Controllers & Handlers (handlers/)"]
+        auth_h["👤 Auth Handler<br/>(auth.go)"]
+        upload_h["📤 Upload Handler<br/>(upload.go)"]
+        download_h["📥 Download Handler<br/>(download.go)"]
+        search_h["🔍 Search Handler<br/>(search.go)"]
+        delete_h["🗑️ Delete Handler<br/>(delete.go)"]
+    end
+    
+    subgraph Services ["4. Core Services (services/)"]
+        auth_s["👥 Auth Service<br/>(User & Session Stores)"]
+        crypto_s["🔒 Crypto Service<br/>(Argon2id & AES-GCM)"]
+        meta_s["📝 Metadata Service<br/>(SQLite + FTS5)"]
+    end
+    
+    subgraph Storage ["5. Storage Layer (connectors/)"]
+        conn_local["💾 Local Storage<br/>(local/)"]
+        conn_cloud["☁️ Cloud Storage<br/>(Planned Connectors)"]
     end
 
-    subgraph Middleware ["Middleware & Config (middleware/, config/)"]
-        auth_mw[Auth Middleware: JWT & Session Resolution]
-        cfg[Config Loader: YAML & .env]
-    end
-
-    subgraph Services ["Core Services (services/)"]
-        crypto_s[🔑 crypto: Argon2id KDF & AES-256-GCM]
-        auth_s[👤 auth: User Store & In-Memory Sessions]
-        meta_s[📝 metadata: SQLite + FTS5 Document Store]
-    end
-
-    subgraph Storage ["Storage Layer (connectors/)"]
-        conn_local[💾 local: Filesystem Storage Connector]
-        conn_cloud[☁️ cloud: S3/GCS/Drive Connector - Planned]
-    end
-
-    Mux -->|"/v1/auth/*"| auth_h
-    Mux -->|"/v1/docs/*"| auth_mw
-    auth_mw -->|Authenticated Context: UserID & KEK| upload_h & download_h & search_h & delete_h
-
-    auth_h -->|Read/Write Credentials| auth_s
+    %% Connections
+    Client --> Mux
+    
+    %% Public Routes
+    Mux -->|"/v0.1/auth/*"| auth_h
+    
+    %% Protected Routes
+    Mux -->|"/v0.1/docs/*"| auth_mw
+    auth_mw -->|Injects KEK & UserID| upload_h
+    auth_mw -->|Injects KEK & UserID| download_h
+    auth_mw -->|Injects KEK & UserID| search_h
+    auth_mw -->|Injects KEK & UserID| delete_h
+    
+    %% Middleware resolving session
+    auth_mw -.->|Resolves Token KEK| auth_s
+    
+    %% Handler service interactions
+    auth_h -->|Register/Login/Session| auth_s
     auth_h -->|Derive KEK via Argon2id| crypto_s
     
-    upload_h & download_h & delete_h -->|CRUD Metadata & FTS5| meta_s
-    upload_h & download_h & delete_h -->|Read/Write Encrypted Files| conn_local
+    upload_h -->|1. Stream Encrypt| crypto_s
+    upload_h -->|2. Write File| conn_local
+    upload_h -->|3. Store Metadata| meta_s
     
-    upload_h & download_h -->|Encrypt/Decrypt Stream| crypto_s
+    download_h -->|1. Fetch Metadata| meta_s
+    download_h -->|2. Read File| conn_local
+    download_h -->|3. Stream Decrypt| crypto_s
+    
+    search_h -->|Query SQLite FTS5| meta_s
+    
+    delete_h -->|1. Delete Metadata| meta_s
+    delete_h -->|2. Delete File| conn_local
 
-    class Handlers,Middleware,Services,Storage layer;
-    class auth_h,upload_h,download_h,search_h,delete_h,auth_mw,cfg,crypto_s,auth_s,meta_s,conn_local,conn_cloud component;
-    class auth_mw,crypto_s,auth_s,meta_s,conn_local active;
+    %% Classes
+    class Client client;
+    class Mux router;
+    class auth_mw middleware;
+    class auth_h,upload_h,download_h,search_h,delete_h handler;
+    class auth_s,crypto_s,meta_s service;
+    class conn_local storage;
+    class conn_cloud inactive;
 ```
 
 ---
@@ -117,42 +152,52 @@ graph TD
 
 DocOps uses **two-layer envelope encryption** so that compromising any single component does not expose plaintext documents:
 
-<div style="border: 1px solid #d0d7de; border-radius: 6px; padding: 16px; font-family: sans-serif; background-color: #f6f8fa; margin: 16px 0;">
-  <table style="width: 100%; border-collapse: collapse; text-align: center;">
-    <tr>
-      <td style="width: 25%; padding: 8px; border: 1px solid #d0d7de; background-color: #ffffff; border-radius: 4px;">
-        <strong>User Password</strong>
-      </td>
-      <td style="width: 10%; font-size: 20px; color: #57606a;">➔</td>
-      <td style="width: 25%; padding: 8px; border: 1px solid #d0d7de; background-color: #ffffff; border-radius: 4px;">
-        <strong>Argon2id KDF</strong>
-      </td>
-      <td style="width: 10%; font-size: 20px; color: #57606a;">➔</td>
-      <td style="width: 30%; padding: 8px; border: 1px solid #d0d7de; background-color: #e8f5e9; border-radius: 4px;">
-        <strong>Key Encrypting Key (KEK)</strong>
-        <div style="font-size: 11px; color: #2e7d32; margin-top: 4px;">In-memory only, never persisted</div>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="4" style="height: 20px;"></td>
-      <td style="font-size: 20px; color: #57606a;">⬇</td>
-    </tr>
-    <tr>
-      <td colspan="2" style="padding: 8px; border: 1px solid #d0d7de; background-color: #fff8e1; border-radius: 4px; text-align: left; font-size: 13px;">
-        <strong>Per-Document Key (DEK)</strong>
-        <div style="font-size: 11px; color: #b78103; margin-top: 4px;">Random 256-bit key per document</div>
-      </td>
-      <td style="font-size: 20px; color: #57606a;">➔</td>
-      <td colspan="2" style="padding: 12px; border: 1px solid #d0d7de; background-color: #e3f2fd; border-radius: 4px; text-align: left;">
-        <strong>DEK Encryption Flow</strong>
-        <div style="font-size: 12px; margin-top: 4px; color: #0d47a1;">
-          • Encrypted DEK is stored in SQLite Database<br>
-          • Encrypted File Content is saved via the Storage Connector
-        </div>
-      </td>
-    </tr>
-  </table>
-</div>
+```mermaid
+graph TD
+    subgraph Ephemeral_Memory ["💻 Ephemeral Server Memory (RAM)"]
+        direction TB
+        
+        subgraph Key_Derivation ["1. Key Derivation (At Login)"]
+            Pwd([🔑 User Password]) -->|Argon2id KDF| KEK[🔑 Key Encrypting Key - KEK]
+        end
+
+        subgraph Envelope_Encryption ["2. Envelope Encryption (At Upload)"]
+            PlainFile[📄 Plaintext Document] -->|AES-256-GCM Chunked| EncEngine{⚙️ Crypto Engine}
+            DEK[🔑 Random 256-bit DEK] -->|1. File Key| EncEngine
+            
+            KEK -->|2. Wrap Key| WrapEngine{⚙️ Key Wrapper}
+            DEK -->|Plain DEK| WrapEngine
+        end
+        
+        style Ephemeral_Memory fill:#f0fdf4,stroke:#16a34a,stroke-width:2px;
+        style Key_Derivation fill:#ffffff,stroke:#86efac,stroke-width:1px;
+        style Envelope_Encryption fill:#ffffff,stroke:#86efac,stroke-width:1px;
+    end
+
+    subgraph Persistent_Storage ["💾 Persistent Storage (Disk)"]
+        direction LR
+        
+        DB[(📝 SQLite Metadata DB)]
+        Disk[💾 File Storage / Disk]
+        
+        style Persistent_Storage fill:#fff7ed,stroke:#ea580c,stroke-width:2px;
+        style DB fill:#ffffff,stroke:#ffedd5,stroke-width:1px;
+        style Disk fill:#ffffff,stroke:#ffedd5,stroke-width:1px;
+    end
+
+    %% Flows from memory to disk
+    WrapEngine -->|3. Encrypted DEK| DB
+    EncEngine -->|4. Encrypted Content| Disk
+
+    %% Custom styling definitions
+    classDef key fill:#ecfdf5,stroke:#059669,stroke-width:1.5px,color:#065f46;
+    classDef data fill:#f0f9ff,stroke:#0284c7,stroke-width:1.5px,color:#075985;
+    classDef engine fill:#faf5ff,stroke:#7c3aed,stroke-width:1.5px,color:#581c87;
+
+    class Pwd,KEK,DEK key;
+    class PlainFile data;
+    class EncEngine,WrapEngine engine;
+```
 
 | Property | Guarantee |
 |:---|:---|
@@ -163,6 +208,39 @@ DocOps uses **two-layer envelope encryption** so that compromising any single co
 | **JWT contents** | Opaque session token only — no key material in the token |
 | **Session revocation** | Server-side session store; logout invalidates immediately |
 | **Timing attacks** | Constant-time comparison for password verification |
+
+### Chunked Streaming Protocol
+
+To ensure constant memory usage regardless of document size, DocOps processes all document uploads and downloads via a chunked streaming envelope encryption pipeline. Plaintext data is never held fully in memory or written to disk in its raw form:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as 🌐 HTTP Client
+    participant H as 📤 Upload Handler
+    participant C as 🔒 Crypto Service
+    participant S as 💾 Storage Connector
+    participant DB as 📝 Metadata Store
+
+    Client->>H: 1. POST /v0.1/docs/upload (Multipart Stream)
+    H->>C: 2. Generate random 256-bit DEK & IV
+    H->>C: 3. Wrap DEK using KEK from Session Context
+    C-->>H: Return Encrypted DEK
+    
+    rect rgb(240, 253, 244)
+        note over H,S: Chunked Encryption Loop (Constant Memory)
+        loop For each 64 KB chunk in multipart stream
+            H->>H: Read 64 KB Plaintext
+            H->>C: Encrypt 64 KB chunk using DEK + unique nonce
+            C-->>H: Return Encrypted chunk
+            H->>S: Stream-write Encrypted chunk to storage
+        end
+    end
+    
+    H->>DB: 4. Store Document Metadata (Encrypted DEK, size, tags, etc.)
+    DB-->>H: Metadata stored successfully
+    H-->>Client: 5. Return 201 Created (JSON metadata, sensitive fields omitted)
+```
 
 ---
 
@@ -217,24 +295,24 @@ make local_connector_test        #  7 tests — filesystem upload, download, del
 
 | Method | Endpoint | Description |
 |:---|:---|:---|
-| `POST` | `/v1/auth/register` | Create account — returns access + refresh cookies |
-| `POST` | `/v1/auth/login` | Authenticate — returns access + refresh cookies |
-| `POST` | `/v1/auth/refresh` | Exchange refresh cookie for new access cookie |
-| `POST` | `/v1/auth/logout` | Revoke sessions and clear cookies |
+| `POST` | `/v0.1/auth/register` | Create account — returns access + refresh cookies |
+| `POST` | `/v0.1/auth/login` | Authenticate — returns access + refresh cookies |
+| `POST` | `/v0.1/auth/refresh` | Exchange refresh cookie for new access cookie |
+| `POST` | `/v0.1/auth/logout` | Revoke sessions and clear cookies |
 
 ### Documents
 
 | Method | Endpoint | Description |
 |:---|:---|:---|
-| `POST` | `/v1/docs/upload` | Upload encrypted document (multipart/form-data) |
-| `GET`  | `/v1/docs/{docID}/download` | Download and decrypt a document (streaming) |
-| `GET`  | `/v1/docs/search?q={query}` | Full-text search across document metadata |
-| `DELETE`| `/v1/docs/{docID}` | Securely delete document metadata and storage file |
+| `POST` | `/v0.1/docs/upload` | Upload encrypted document (multipart/form-data) |
+| `GET`  | `/v0.1/docs/{docID}/download` | Download and decrypt a document (streaming) |
+| `GET`  | `/v0.1/docs/search?q={query}` | Full-text search across document metadata |
+| `DELETE`| `/v0.1/docs/{docID}` | Securely delete document metadata and storage file |
 
 #### Upload Request
 
 ```bash
-curl -X POST http://localhost:8080/v1/docs/upload \
+curl -X POST http://localhost:8080/v0.1/docs/upload \
   -b cookies.txt \
   -F "file=@document.pdf" \
   -F "tags=legal,2026"
@@ -257,7 +335,7 @@ curl -X POST http://localhost:8080/v1/docs/upload \
 #### Download Request
 
 ```bash
-curl -X GET http://localhost:8080/v1/docs/doc_a1b2c3d4-.../download \
+curl -X GET http://localhost:8080/v0.1/docs/doc_a1b2c3d4-.../download \
   -b cookies.txt \
   -o document.pdf
 ```
@@ -267,7 +345,7 @@ The response streams the decrypted file with appropriate `Content-Type` and `Con
 #### Search Request
 
 ```bash
-curl -X GET "http://localhost:8080/v1/docs/search?q=quarterly" \
+curl -X GET "http://localhost:8080/v0.1/docs/search?q=quarterly" \
   -b cookies.txt
 ```
 
@@ -293,7 +371,7 @@ Search matches against document names, tags, and extracted text via the FTS5 ind
 #### Delete Request
 
 ```bash
-curl -X DELETE http://localhost:8080/v1/docs/doc_a1b2c3d4-... \
+curl -X DELETE http://localhost:8080/v0.1/docs/doc_a1b2c3d4-... \
   -b cookies.txt
 ```
 
