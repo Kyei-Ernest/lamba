@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borla Tracker — Pitch Proposal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green-900: #064e3b;
+            --green-700: #047857;
+            --green-600: #059669;
+            --green-500: #10b981;
+            --green-400: #34d399;
+            --green-100: #d1fae5;
+            --green-50: #ecfdf5;
+            --amber-600: #d97706;
+            --amber-100: #fef3c7;
+            --slate-900: #0f172a;
+            --slate-700: #334155;
+            --slate-500: #64748b;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--slate-700);
+            line-height: 1.7;
+            background: var(--slate-100);
+        }
+
+        /* ── Hero ── */
+        .hero {
+            background: linear-gradient(135deg, var(--green-900) 0%, var(--green-700) 50%, var(--green-500) 100%);
+            color: var(--white);
+            padding: 80px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '♻';
+            position: absolute;
+            font-size: 300px;
+            opacity: 0.05;
+            top: -40px;
+            right: -40px;
+        }
+
+        .hero .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(8px);
+            padding: 6px 20px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+        }
+
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 52px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .hero .subtitle {
+            font-size: 20px;
+            font-weight: 400;
+            opacity: 0.9;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        /* ── Container ── */
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* ── Sections ── */
+        section {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 48px 48px;
+            margin: 32px auto;
+            max-width: 860px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .section-number {
+            display: inline-block;
+            background: var(--green-100);
+            color: var(--green-700);
+            font-weight: 700;
+            font-size: 13px;
+            padding: 4px 12px;
+            border-radius: 100px;
+            margin-bottom: 12px;
+        }
+
+        section h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 30px;
+            color: var(--slate-900);
+            margin-bottom: 20px;
+        }
+
+        section h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--green-900);
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+
+        section p {
+            margin-bottom: 16px;
+        }
+
+        /* ── Executive Summary Card ── */
+        .exec-summary {
+            background: linear-gradient(135deg, var(--green-50), var(--white));
+            border-left: 4px solid var(--green-500);
+        }
+
+        .exec-summary p {
+            font-size: 17px;
+        }
+
+        /* ── Tables ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        thead th {
+            background: var(--green-900);
+            color: var(--white);
+            text-align: left;
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        thead th:first-child { border-radius: 8px 0 0 0; }
+        thead th:last-child { border-radius: 0 8px 0 0; }
+
+        tbody td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--slate-100);
+            vertical-align: top;
+        }
+
+        tbody tr:hover { background: var(--green-50); }
+
+        tbody tr:last-child td:first-child { border-radius: 0 0 0 8px; }
+        tbody tr:last-child td:last-child { border-radius: 0 0 8px 0; }
+
+        /* ── Highlight Row ── */
+        .highlight-row td {
+            background: var(--green-100);
+            font-weight: 700;
+            color: var(--green-900);
+        }
+
+        /* ── Lists ── */
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 16px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        li strong {
+            color: var(--slate-900);
+        }
+
+        /* ── Platform Diagram ── */
+        .diagram {
+            background: var(--slate-900);
+            color: var(--green-400);
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            padding: 28px 24px;
+            border-radius: 12px;
+            overflow-x: auto;
+            margin: 24px 0;
+            white-space: pre;
+        }
+
+        /* ── Callout ── */
+        .callout {
+            background: var(--amber-100);
+            border-left: 4px solid var(--amber-600);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 24px 0;
+            font-size: 15px;
+        }
+
+        .callout strong {
+            color: var(--amber-600);
+        }
+
+        /* ── Phase Cards ── */
+        .phase-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .phase-card {
+            border: 1px solid var(--slate-300);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+        }
+
+        .phase-card .phase-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: var(--green-600);
+            color: var(--white);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 14px;
+            border-radius: 100px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .phase-card h4 {
+            color: var(--slate-900);
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .phase-card ul {
+            margin-bottom: 0;
+        }
+
+        /* ── Feature Cards ── */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: var(--green-50);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .feature-card .icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .feature-card h4 {
+            color: var(--green-900);
+            margin-bottom: 8px;
+        }
+
+        .feature-card ul {
+            margin-bottom: 0;
+            font-size: 14px;
+        }
+
+        /* ── Quote ── */
+        .closing-quote {
+            text-align: center;
+            padding: 60px 40px;
+            max-width: 860px;
+            margin: 0 auto 48px;
+        }
+
+        .closing-quote blockquote {
+            font-family: 'Playfair Display', serif;
+            font-size: 24px;
+            color: var(--green-900);
+            font-style: italic;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        /* ── Why-Us Bullets ── */
+        .why-us-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .why-us-list li {
+            padding: 12px 16px;
+            background: var(--green-50);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+
+        .why-us-list li::before {
+            content: '✓ ';
+            color: var(--green-600);
+            font-weight: 700;
+        }
+
+        /* ── Print ── */
+        @media print {
+            body { background: white; }
+            .hero { padding: 40px 24px; }
+            section { box-shadow: none; border: 1px solid #e2e8f0; page-break-inside: avoid; }
+        }
+
+        @media (max-width: 640px) {
+            .hero h1 { font-size: 32px; }
+            .hero { padding: 48px 20px; }
+            section { padding: 28px 20px; margin: 16px 12px; }
+            section h2 { font-size: 24px; }
+            table { font-size: 12px; }
+            .diagram { font-size: 10px; padding: 16px 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ═══════════════ HERO ═══════════════ -->
+    <header class="hero">
+        <div class="badge">Pitch Proposal</div>
+        <h1>Borla Tracker</h1>
+        <p class="subtitle">Ghana's Digital Waste Collection &amp; Recycling Marketplace</p>
+    </header>
+
+    <!-- ═══════════════ EXECUTIVE SUMMARY ═══════════════ -->
+    <section class="exec-summary">
+        <span class="section-number">Executive Summary</span>
+        <h2>The Big Picture</h2>
+        <p>
+            <strong>Borla Tracker</strong> is a software-only digital marketplace that connects households who need waste
+            pickup with independent waste collectors (<em>Aboboyaa</em> tricycle riders) and formal waste management
+            companies (WMCs). Think of it as <strong>Uber for waste collection</strong> — we own no trucks, no bins, and
+            no landfills. We simply provide the technology platform that matches demand with supply, processes payments
+            digitally via Mobile Money, and unlocks the hidden value in Ghana's recyclable waste stream.
+        </p>
+        <p>
+            We are a team of <strong>university students</strong> in Ghana who understand the waste crisis firsthand —
+            because we live in it. We are building a solution rooted in local realities, not imported assumptions.
+        </p>
+    </section>
+
+    <!-- ═══════════════ 1. MARKET NEED ═══════════════ -->
+    <section>
+        <span class="section-number">01</span>
+        <h2>Addressing the Market Need</h2>
+        <p>
+            Ghana's urban areas generate over <strong>12,000 tonnes of solid waste daily</strong>, yet collection
+            infrastructure consistently fails to keep up. The consequences are visible on every street corner.
+        </p>
+
+        <h3>The Core Problems</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Problem</th>
+                    <th>Who It Hurts</th>
+                    <th>Scale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Unreliable scheduled pickups</strong> — Formal WMCs often delay collections by weeks, leaving bins overflowing.</td>
+                    <td>Households, businesses</td>
+                    <td>40%+ of Accra residents report irregular collection</td>
+                </tr>
+                <tr>
+                    <td><strong>Inaccessible neighborhoods</strong> — Large compactor trucks cannot enter narrow, unpaved streets in high-density suburbs.</td>
+                    <td>Low-income communities (Nima, Ashaiman, Chorkor, etc.)</td>
+                    <td>Millions of urban residents in unserved alleys</td>
+                </tr>
+                <tr>
+                    <td><strong>Expensive tipping fees</strong> — Independent tricycle riders pay GHS 10–30 per trip at landfills, cutting deeply into slim daily earnings.</td>
+                    <td><em>Aboboyaa</em> riders (informal collectors)</td>
+                    <td>Thousands of riders across Greater Accra alone</td>
+                </tr>
+                <tr>
+                    <td><strong>Illegal dumping &amp; flooding</strong> — To avoid tipping fees, some collectors dump waste in open drains, causing cholera and severe seasonal flooding.</td>
+                    <td>Everyone — public health crisis</td>
+                    <td>Ghana loses millions of Cedis annually to flood damage</td>
+                </tr>
+                <tr>
+                    <td><strong>Wasted recyclables</strong> — Millions of plastic sachets ("pure water rubbers"), PET bottles, and scrap metals are discarded daily despite active demand from recycling plants.</td>
+                    <td>The environment, the economy</td>
+                    <td>Recycling plants operate well below capacity</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Why Now?</h3>
+        <ul>
+            <li><strong>MTN MoMo penetration</strong> is at an all-time high (40M+ registered accounts in Ghana), making digital payments feasible even in informal markets.</li>
+            <li><strong>Smartphone adoption</strong> is growing rapidly in urban areas, while USSD (<code>*800#</code>) remains universally accessible on basic feature phones.</li>
+            <li><strong>Government pressure</strong> is mounting — the Ministry of Sanitation is actively seeking private-sector digital solutions, and municipal assemblies are under public pressure to solve the "filth" crisis.</li>
+        </ul>
+    </section>
+
+    <!-- ═══════════════ 2. COMPETITIVE ADVANTAGE ═══════════════ -->
+    <section>
+        <span class="section-number">02</span>
+        <h2>Competitive Advantage</h2>
+
+        <h3>What Exists Today vs. What We Do Differently</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Existing Approach</th>
+                    <th>The Limitation</th>
+                    <th>Borla Tracker's Advantage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Zoomlion / WMC monopolies</strong></td>
+                    <td>Capital-heavy (trucks, bins, staff). Unreliable in suburbs. High default rates on monthly billing.</td>
+                    <td><strong>Asset-light middleware.</strong> We own nothing physical. We connect existing riders and WMCs to existing customers.</td>
+                </tr>
+                <tr>
+                    <td><strong>Informal <em>Aboboyaa</em> riders</strong></td>
+                    <td>No digital payment, no route optimization, no customer trust/accountability. High tipping fees eat into income.</td>
+                    <td><strong>We formalize them digitally</strong> — route matching, MoMo payouts, verified completion via PIN codes, and tipping-fee waivers at partner depots.</td>
+                </tr>
+                <tr>
+                    <td><strong>Recycling startups (e.g., Coliba)</strong></td>
+                    <td>Focus only on plastic collection from high-income areas. Don't address general household waste.</td>
+                    <td><strong>We combine both</strong> — general waste collection AND a reverse scrap/recyclables marketplace in one platform.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Our Unique Edge as Students</h3>
+        <ul class="why-us-list">
+            <li><strong>Zero overhead.</strong> No office rent, no salaries to pay ourselves (yet), and no legacy systems. Every Cedi goes into the product.</li>
+            <li><strong>Direct access to the problem.</strong> We live in the communities we are building for. We know the pain of overflowing bins and the frustration of calling Zoomlion with no response.</li>
+            <li><strong>Technical capability in-house.</strong> Our team builds the backend (Django/PostGIS), mobile interfaces, and USSD integrations ourselves — no outsourcing costs.</li>
+        </ul>
+    </section>
+
+    <!-- ═══════════════ 3. OPERATIONAL EXCELLENCE ═══════════════ -->
+    <section>
+        <span class="section-number">03</span>
+        <h2>Operational Excellence</h2>
+
+        <h3>How It Actually Works</h3>
+<div class="diagram">┌───────────────────────────────────────────────────────────────────────────┐
+│                        BORLA TRACKER PLATFORM                            │
+│                     (Pure Software Middleware)                            │
+├───────────────┬───────────────────────┬───────────────────────────────────┤
+│   CLIENT      │     THE PLATFORM      │     COLLECTOR / WMC              │
+│               │                       │                                   │
+│ App or USSD   │  Matching Engine      │  App, USSD, or IVR Voice Call    │
+│ → Select size │  PostGIS Zone Pricing │  → Accept job                    │
+│ → Pay via     │  Escrow Wallet        │  → Collect waste                 │
+│   MoMo        │  PIN Verification     │  → Enter client's 4-digit PIN   │
+│ → Get PIN     │  Instant Payout       │  → Get paid instantly to wallet  │
+└───────────────┴───────────────────────┴───────────────────────────────────┘</div>
+
+        <h3>Key Operational Principles</h3>
+        <ol>
+            <li><strong>We never touch the waste.</strong> We are a technology company, not a sanitation company. Collectors handle the physical work; we handle the digital coordination, payments, and verification.</li>
+            <li><strong>Dual-channel access.</strong> Smartphone users get a full-featured app with GPS tracking and map pinning. Feature-phone users (including illiterate collectors) use a toll-free USSD code (<code>*800#</code>) with local language IVR voice prompts (Twi, Ga, Hausa).</li>
+            <li><strong>PIN-based verification replaces expensive hardware.</strong> When a client requests a pickup, they receive a 4-digit SMS code. The collector enters this code via USSD after picking up the waste. No GPS sensors, no QR scanners, no barcode printers needed.</li>
+            <li><strong>Instant MoMo payouts.</strong> Collectors are paid directly to their MTN/Telecel MoMo wallets the moment a job is verified. No weekly bank transfers, no cash arguments at the gate.</li>
+        </ol>
+
+        <h3>The Reverse Marketplace ("Condemn" Module)</h3>
+        <p>Beyond standard waste collection, we also run a <strong>reverse marketplace</strong> for recyclable materials:</p>
+        <ul>
+            <li>Households with scrap metals, sachet rubbers (LDPE), plastic bottles (PET), or e-waste can list them for sale.</li>
+            <li>Specialized scrap collectors ("Koko-men") accept the job, weigh the materials on-site, and pay the household instantly via wallet transfer.</li>
+            <li>The collector then sells in bulk to registered recycling factories (e.g., Nelplast, Coliba, Tema Steel Works) at a higher wholesale price, keeping the profit margin.</li>
+            <li>The platform earns a small transaction fee on the wholesale payout.</li>
+        </ul>
+    </section>
+
+    <!-- ═══════════════ 4. MARKETING ═══════════════ -->
+    <section>
+        <span class="section-number">04</span>
+        <h2>Marketing &amp; Go-To-Market Strategy</h2>
+        <p>
+            As a student team with limited capital, we cannot afford mass-market TV campaigns. Instead, we deploy
+            <strong>high-impact, low-cost grassroots tactics</strong>:
+        </p>
+
+        <div class="phase-grid">
+            <div class="phase-card">
+                <span class="phase-label">Phase 1 · Months 1–3</span>
+                <h4>Single-Neighborhood Pilot</h4>
+                <ul>
+                    <li><strong>Target:</strong> One well-defined suburb (e.g., Madina, Ashaiman, or our own university neighborhood).</li>
+                    <li><strong>Supply Side:</strong> Walk directly to the local <em>Aboboyaa</em> depot. Onboard 10–15 tricycle riders personally. Demonstrate USSD interface and instant MoMo payouts.</li>
+                    <li><strong>Demand Side:</strong> Go door-to-door. Register 100–200 households. Offer the first 3 pickups at a discounted rate to build trust.</li>
+                    <li><strong>Cost:</strong> Essentially zero — our own time and transport.</li>
+                </ul>
+            </div>
+            <div class="phase-card">
+                <span class="phase-label">Phase 2 · Months 3–6</span>
+                <h4>Word-of-Mouth &amp; Local Radio</h4>
+                <ul>
+                    <li><strong>Collector Referrals:</strong> GHS 5 wallet bonus for every new collector onboarded via referral. Riders talk to each other daily at fuel stations — word spreads fast.</li>
+                    <li><strong>FM Radio Spots:</strong> Short jingles on Twi-language stations (Peace FM, Adom FM). A 30-second spot costs GHS 50–200.</li>
+                    <li><strong>Community Durbars &amp; Church Announcements:</strong> Present at local town halls and through church/mosque networks — the most trusted information channels in Ghanaian neighborhoods.</li>
+                </ul>
+            </div>
+            <div class="phase-card">
+                <span class="phase-label">Phase 3 · Months 6–12</span>
+                <h4>WMC Partnerships &amp; Multi-City Expansion</h4>
+                <ul>
+                    <li><strong>Approach mid-tier WMCs</strong> and offer our platform to manage their last-mile subcontractors. They get route tracking and compliance dashboards; we get access to their customer base.</li>
+                    <li><strong>Expand to Kumasi</strong> (second-largest city) using the same grassroots playbook.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ 5. FINANCING ═══════════════ -->
+    <section>
+        <span class="section-number">05</span>
+        <h2>Financing &amp; Financial Model</h2>
+
+        <h3>A. Revenue Streams</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Revenue Stream</th>
+                    <th>How It Works</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Collection Commission (10%)</strong></td>
+                    <td>We take 10% of every waste pickup transaction.</td>
+                    <td>Client pays GHS 20 → Collector receives GHS 18, Platform keeps GHS 2.</td>
+                </tr>
+                <tr>
+                    <td><strong>Scrap Marketplace Commission (3–5%)</strong></td>
+                    <td>A small fee on wholesale payouts when scrap collectors sell bulk recyclables to factories.</td>
+                    <td>Factory pays collector GHS 300 → Platform keeps GHS 9–15.</td>
+                </tr>
+                <tr>
+                    <td><strong>WMC Dashboard Subscription</strong></td>
+                    <td>Monthly fee for formal WMCs using our supervisor tracking and analytics portal.</td>
+                    <td>GHS 500–2,000/month per company (Phase 3).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>B. Realistic Cost Structure (Student Team)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Expense</th>
+                    <th>Monthly Cost (GHS)</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Server hosting (DigitalOcean/Render)</td>
+                    <td>150–300</td>
+                    <td>PostgreSQL + Django backend</td>
+                </tr>
+                <tr>
+                    <td>SMS gateway (Hubtel / Arkesel)</td>
+                    <td>200–500</td>
+                    <td>Transactional SMS for PINs</td>
+                </tr>
+                <tr>
+                    <td>USSD shortcode (via Hubtel/NaLo)</td>
+                    <td>300–800</td>
+                    <td>Monthly shortcode rental</td>
+                </tr>
+                <tr>
+                    <td>MoMo API fees (Paystack)</td>
+                    <td>Variable (~1.5%)</td>
+                    <td>Deducted per transaction</td>
+                </tr>
+                <tr>
+                    <td>Transport &amp; fieldwork</td>
+                    <td>200–400</td>
+                    <td>Pilot area onboarding trips</td>
+                </tr>
+                <tr class="highlight-row">
+                    <td>Total Monthly Burn</td>
+                    <td>~GHS 1,000–2,000</td>
+                    <td>Roughly $70–$140 USD/month</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>C. Funding Sources (Realistic for Students in Ghana)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Amount (GHS)</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Personal contributions</strong> (5 co-founders × GHS 500)</td>
+                    <td>2,500</td>
+                    <td>Immediate</td>
+                </tr>
+                <tr>
+                    <td><strong>University innovation fund / incubator</strong> (e.g., KNUST, UG, Ashesi)</td>
+                    <td>5,000–10,000</td>
+                    <td>Application stage</td>
+                </tr>
+                <tr>
+                    <td><strong>MEST Africa Open Innovation Program</strong></td>
+                    <td>10,000–50,000</td>
+                    <td>Competitive application</td>
+                </tr>
+                <tr>
+                    <td><strong>Ghana Innovation Hub / iSpace Foundation</strong></td>
+                    <td>5,000–20,000</td>
+                    <td>Incubator cohort</td>
+                </tr>
+                <tr>
+                    <td><strong>Mastercard Foundation Scholars Program</strong></td>
+                    <td>Variable</td>
+                    <td>Grant/mentorship</td>
+                </tr>
+                <tr>
+                    <td><strong>Pilot revenue</strong> (100 transactions/week × GHS 2)</td>
+                    <td>~800/month</td>
+                    <td>Self-sustaining by Month 3</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <strong>Key Insight:</strong> Because our monthly burn is under GHS 2,000, we can realistically
+            self-sustain from transaction commissions alone after onboarding just 100 active households — a target
+            achievable within 2–3 months of grassroots fieldwork.
+        </div>
+    </section>
+
+    <!-- ═══════════════ 6. TEAM ═══════════════ -->
+    <section>
+        <span class="section-number">06</span>
+        <h2>The Team</h2>
+        <p>
+            We are a team of <strong>university students</strong> in Ghana, combining technical engineering skills with
+            on-the-ground knowledge of the waste crisis:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Role</th>
+                    <th>Responsibility</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Technical Lead (Backend)</strong></td>
+                    <td>Django REST API, PostgreSQL/PostGIS, Celery task queues, Paystack/MoMo integrations</td>
+                </tr>
+                <tr>
+                    <td><strong>Mobile &amp; Frontend Developer</strong></td>
+                    <td>Client-facing app (React Native or Flutter), supervisor dashboard</td>
+                </tr>
+                <tr>
+                    <td><strong>USSD &amp; Telecom Integration</strong></td>
+                    <td>Hubtel/NaLo USSD shortcode development, SMS gateway, IVR voice flows</td>
+                </tr>
+                <tr>
+                    <td><strong>Operations &amp; Field Lead</strong></td>
+                    <td>Collector onboarding, depot visits, community engagement, pilot coordination</td>
+                </tr>
+                <tr>
+                    <td><strong>Business &amp; Partnerships</strong></td>
+                    <td>WMC outreach, recycling factory partnerships, grant applications, financial modeling</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Why Us?</h3>
+        <ul class="why-us-list">
+            <li>We are <strong>not outsiders</strong> parachuting in with a Silicon Valley playbook. We are Ghanaians who have grown up navigating the same broken waste system we are now building to fix.</li>
+            <li>We have already built a working backend with user authentication, zone-based pricing, wallet systems, and payment processing — <strong>the core product exists today</strong>.</li>
+            <li>We are willing to do the unglamorous fieldwork: walking through <em>Aboboyaa</em> depots, registering households door-to-door, and sitting with illiterate riders to test our USSD menus until they work flawlessly.</li>
+        </ul>
+    </section>
+
+    <!-- ═══════════════ 7. FUTURE ROADMAP ═══════════════ -->
+    <section>
+        <span class="section-number">07</span>
+        <h2>Future Roadmap &amp; Planned Features</h2>
+        <p>
+            Beyond the core waste collection and recyclables marketplace, we have identified additional community-driven
+            features that strengthen the platform's social impact and long-term stickiness:
+        </p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="icon">📸</div>
+                <h4>A. Community Environmental Reporting ("Sanitation Watch")</h4>
+                <ul>
+                    <li><strong>Photo &amp; Video Evidence:</strong> Any citizen can snap a photo or record a video of choked gutters, illegal dump sites, or overflowing public bins.</li>
+                    <li><strong>GPS-Tagged Reports:</strong> Reports are automatically tagged with location and routed to a public dashboard visible to the relevant Municipal Assembly (AMA, KMA, TMA).</li>
+                    <li><strong>Severity Scoring:</strong> Reports are categorized by severity — allowing authorities and volunteers to prioritize response.</li>
+                    <li><strong>Accountability Loop:</strong> Reported sites are tracked publicly. When cleaned, the resolver uploads "before and after" photos, closing the report.</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🤝</div>
+                <h4>B. Volunteer Cleanup Mobilization</h4>
+                <ul>
+                    <li>When a reported site is severe but no municipal response is forthcoming, the platform broadcasts a <strong>volunteer cleanup call</strong> to registered users in the area.</li>
+                    <li>Volunteers who participate earn "Green Points" (redeemable for data bundles, ECG credits, or collection discounts) and public recognition on a community leaderboard.</li>
+                    <li>This turns passive reporting into active community-led intervention.</li>
+                </ul>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🚽</div>
+                <h4>C. Sanitation Services Directory ("Toilet Pullers" &amp; Septic Services)</h4>
+                <ul>
+                    <li>A <strong>verified directory</strong> of licensed septic tank emptying and toilet-pulling services, listed by location, pricing, and user ratings.</li>
+                    <li>Households can request a desludging service directly through the app or USSD, just like requesting a waste pickup.</li>
+                    <li>This extends Borla Tracker from solid waste into <strong>full household sanitation</strong> — a natural product expansion.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ 8. THE ASK ═══════════════ -->
+    <section>
+        <span class="section-number">08</span>
+        <h2>The Ask</h2>
+        <p>We are seeking:</p>
+        <ol>
+            <li><strong>Incubation &amp; Mentorship:</strong> Access to a structured accelerator program (e.g., MEST, iSpace, or a university incubator) for business guidance, legal structuring, and investor introductions.</li>
+            <li><strong>Seed Grant of GHS 10,000–20,000</strong> (~$700–$1,400 USD) to cover:
+                <ul>
+                    <li>USSD shortcode acquisition and 6 months of SMS gateway costs.</li>
+                    <li>Pilot-area transport and onboarding materials.</li>
+                    <li>Server scaling for the first 500 active users.</li>
+                </ul>
+            </li>
+            <li><strong>Strategic Introductions</strong> to mid-tier WMCs and recycling factories willing to pilot our depot integration and wholesale off-taker modules.</li>
+        </ol>
+    </section>
+
+    <!-- ═══════════════ CLOSING QUOTE ═══════════════ -->
+    <div class="closing-quote">
+        <blockquote>
+            "The waste is already there. The collectors are already there. The mobile money is already there.
+            All that is missing is the software to connect them."
+        </blockquote>
+    </div>
+
+</body>
+</html>
