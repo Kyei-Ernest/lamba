@@ -1,345 +1,158 @@
-# Borla Master Django Project — Full App Audit
+## 📊 Comprehensive Project Analysis — Borla Tracker WMS
 
-> Scanned: 2026-07-14  
-> Command: `python manage.py test` → **FAILED** (65 tests, 7 errors)  
-> 7 errors are all the same root cause: `company_username` field removed from Supervisor model but tests still reference it.
+After an in-depth examination of the codebase, documentation, audit reports, and live verification, here is the detailed breakdown of what’s working well and what needs attention.
 
 ---
 
-## Table of Contents
-1. [accounts](#1-accounts)
-2. [borla_master (project root)](#2-borla_master)
-3. [client](#3-client)
-4. [collection_management](#4-collection_management)
-5. [collector](#5-collector)
-6. [notifications](#6-notifications)
-7. [on_demand](#7-on_demand)
-8. [payment](#8-payment)
-9. [routes](#9-routes)
-10. [scheduled_request](#10-scheduled_request)
-11. [supervisor](#11-supervisor)
-12. [wallet](#12-wallet)
-13. [waste_management_company](#13-waste_management_company)
-14. [zones](#14-zones)
-15. [Overall Test Status](#15-overall-test-status)
+## ✅ WHAT’S RIGHT (Strengths)
+
+### 1. Architecture & System Design
+| Aspect | Assessment |
+|---|---|
+| **Modularity** | 13 Django apps with clear separation of concerns (accounts, payment, wallet, zones, routes, etc.) |
+| **Microservices** | Go WebSocket service for real-time GPS/Chat + Django REST API + Celery workers + Redis Pub/Sub |
+| **Geospatial** | PostGIS integration with spatial queries (contains, within, distance) for zones, service areas, dispatch |
+| **Async Background** | Celery workers with beat scheduler for incentives, settlements, notification dispatch |
+| **Frontend/Backend split** | React 19 + Vite frontend communicates with Django REST API and Go WebSocket independently |
+
+### 2. Testing & Quality
+| Metric | Value |
+|---|---|
+| **Total tests** | 346 (all passing) |
+| **Payment coverage** | 98% (views, services, models, serializers) |
+| **Wallet coverage** | 98% (views, tasks, models) |
+| **Apps covered** | 12 of 13 have tests; 1 app (notifications) has empty test file |
+| **Documentation** | Comprehensive README, AUDIT.md, VERIFICATION_REPORT.md, Swagger/ReDoc API docs, inline docstrings |
+
+### 3. Security
+| Feature | Implementation |
+|---|---|
+| **Authentication** | JWT (SimpleJWT) with access/refresh tokens, token blacklisting |
+| **Production settings** | HSTS (1 year), secure cookies, XSS filter, CORS restrictions, rate limiting (100/hr anon, 1000/hr auth) |
+| **Webhook verification** | HMAC-SHA512 for Paystack, HMAC-SHA256 for MTN MoMo |
+| **Password reset** | Bird API email integration with expiring signed tokens |
+
+### 4. Data Integrity & Audit
+| Model | Feature |
+|---|---|
+| **CollectionRecord** | Immutable audit log; client deletion preserves records (SET_NULL) |
+| **Wallet** | Balance tracking with pre/post transaction snapshots, pending credit/debit tracking |
+| **Payment** | Status lifecycle (pending → processing → completed/failed/refunded), provider response JSON storage |
+| **Notifications** | Delivery tracking (sent/failed/retry), provider ID capture |
+
+### 5. Feature Completeness
+| Module | Working |
+|---|---|
+| Real-time GPS tracking | ✅ Go WebSocket + Redis Pub/Sub + Django bridge |
+| E2E Encrypted Chat | ✅ X25519 ECDH + AES-256-GCM |
+| Route Optimization | ✅ Nearest-neighbor + OSRM Trip API (TSP) |
+| Dynamic Pricing | ✅ Zone-based multipliers, waste type pricing, bag/bin pricing |
+| Incentive/Penalty System | ✅ Segregation compliance, punctuality, GPS fidelity bonuses |
+| Multi-channel Notifications | ✅ SMS (Africa’s Talking / Twilio / Console), Email, Push (stub) |
+| Digital Wallet | ✅ Credit/debit/transfer/settlement with transaction history |
+| Payment Processing | ✅ Paystack (MoMo/Card/Bank), Cash, Webhook handling |
+| Admin Dashboard | ✅ System overview, collector stats, zone stats, trends |
 
 ---
 
-## 1. accounts
+## ❌ WHAT’S WRONG (Issues & Risks)
 
-**Directory:** `accounts/`
+### 🔴 Critical Bugs (Will Crash at Runtime)
 
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `User` (custom auth model extending `AbstractBaseUser`, `PermissionsMixin`), `CustomUserManager` |
-| **Serializers** | `serializers.py` — `LoginSerializer`, `TokenRefreshCustomSerializer`, `UserProfileSerializer` |
-| **Views** | `views.py` — `LoginView`, `TokenRefreshView`, `LogoutView`, `UserProfileView`, `AdminUserListView`, `SupervisorDashboardStatsView`, `AdminDashboardView`, `AdminCollectorStatsView`, `AdminZoneStatsView`, `AdminTrendsView` |
-| **URLs** | `urls.py` — `token/refresh/`, `login/`, `logout/`, `me/`, `geocode/search/`, `geocode/reverse/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 3 test classes: `UserRegistrationTests` (2 tests), `AuthenticationFlowTests` (6 tests), `LogoutTests` (1 test) |
-| **Other** | `permissions.py`, `services.py` (`AdminStatisticsService`), `tasks.py`, `geocode.py`, `management/commands/seed_all_data.py` |
+| # | Bug | File | Impact |
+|---|---|---|---|
+| 1 | **`LiveCollectorsView` references non-existent `last_known_location` field** | `collector/views.py:489` | **The live tracking endpoint crashes.** Collector model has `last_known_latitude`/`last_known_longitude`, not a PointField called `last_known_location`. |
+| 2 | **Go bridge resets ALL collectors to offline every 30 seconds** | `internal/sync/django_bridge.go:77` | **Destructive race condition.** If sync overlaps with a collector sending location, the collector may be incorrectly marked offline. |
+| 3 | **`Point.distance()` returns *degrees*, not meters** on SRID 4326 | `routes/models.py:93`, `routes/services.py:131` | **All route distance calculations are wrong by a factor of ~111,000.** Using ST_Distance with geography type is required. |
+| 4 | **`AutoAssignmentService` accepts collectors with no location** as “within range” | `on_demand/services.py:134-136` | **Collectors with null lat/lng are treated as matching**, causing incorrect dispatch assignments. |
+| 5 | **`auto_generate_stops()` references `client.location` — doesn't exist on Client model** | `routes/services.py:35` | **Auto stop generation raises AttributeError.** Client model has no PointField `location`; it's on `ClientAddress`. |
+| 6 | **Pricing calculator waste type mismatch** (e.g., 'wet', 'sanitary') vs model choices | `on_demand/pricing_calculator.py:24-33` | **KeyError thrown when multiplier not found** for valid waste types. |
+| 7 | **`payment/models.py` `mark_completed` doesn't accept `provider_response` keyword** | `payment/models.py:109-115` | **Calls in `services.py` would raise TypeError.** Fixed in audit but the pattern is now inconsistent. |
 
-**Test Result:** All pass ✓
+### 🟡 Security Concerns
 
----
+| Issue | Detail |
+|---|---|
+| **Plain-text account numbers** | `PaymentMethod.account_number` stored as `CharField` with comment "encrypted in production" — **no encryption implemented.** |
+| **No 2FA for admin** | Admin dashboard accessible with single JWT factor. |
+| **CORS overshare** | `CORS_ALLOW_ALL_ORIGINS = True` in dev (env-controlled); production overrides but conditional import could mask issues if DEBUG is misconfigured. |
+| **Rate limiting gap** | Password reset (`/forgot-password/` and `/reset-password/`) have no rate limiting — could be used for enumeration or brute force. |
+| **Reset token in URL** | Password reset link includes JWT in query parameter — could be leaked via referrer header or browser history. |
 
-## 2. borla_master
+### 🟡 Code Quality & Maintainability
 
-**Directory:** `borla_master/` (project root)
+| Issue | Location | Details |
+|---|---|---|
+| **Duplicated waste color maps** | `LiveCollectorMap.tsx` and `LiveDashboardPage.tsx` | Same definition in two places — divergence risk. |
+| **Float vs Decimal** | `zones/models.py:93` | `service_fee_multiplier` default is `1.0` (float) not `Decimal('1.0')`. Mixed types cause precision warnings. |
+| **Singleton pricing calculator** | `on_demand/pricing_calculator.py:176` | Module-level singleton may leak state between tests. |
+| **No tests for notifications app** | `notifications/tests.py` | Empty file — critical feature untested. |
+| **Missing service/task tests** | collector, routes, notifications | Services and tasks have 0% test coverage in these apps. |
+| **Hardcoded freshness cutoff (2 min)** | `on_demand/services.py:276` | Not configurable via settings. |
+| **Backend → OSRM direct calls from frontend** | `useRouteNavigation.ts:134` | Bypasses Django backend, losing caching/rate limiting. |
 
-| Artifact | Files |
-|----------|-------|
-| **Models** | None |
-| **Serializers** | None |
-| **Views** | None (urls.py wires everything together) |
-| **URLs** | `urls.py` — Root URLConf including all app routes + Swagger/ReDoc + admin endpoints |
-| **Templates** | None |
-| **Static Files** | None (Swagger UI in `drf-yasg` auto-generates) |
-| **Tests** | None |
-| **Other** | `settings.py`, `production.py`, `celery.py`, `asgi.py`, `wsgi.py`, `health.py` (health check endpoint) |
+### 🟡 Architecture & Deployment
 
-**Installed Apps** (all 13 custom apps): accounts, client, waste_management_company, supervisor, collector, zones, routes, collection_management, on_demand, scheduled_request, wallet, payment, notifications
+| Concern | Details |
+|---|---|
+| **No connection pooling** | `CONN_MAX_AGE=600` (10 min) but no explicit pool like PgBouncer or psycopg_pool. |
+| **Shared JWT secret across services** | Django and Go services use the same `SECRET_KEY` for JWT validation — ideally use separate signing keys with a trust relationship. |
+| **No service discovery / API gateway** | Frontend must know both Django (port 8000) and Go (port 8081) endpoints. |
+| **Potential file `accounts_credentials.json`** | Present at root — could contain sensitive test credentials. |
+| **No CI/CD pipeline** | No `.github/workflows/` or equivalent. |
 
-**Test Result:** N/A (no tests) ✓
+### 🟡 Minor Issues
 
----
-
-## 3. client
-
-**Directory:** `client/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Client` (OneToOne to User), `ClientAddress` (with PostGIS PointField) |
-| **Serializers** | `serializers.py` — `UserSerializer`, `ClientSerializer`, `ClientCreateSerializer`, `ClientListSerializer`, `ClientUpdateSerializer` |
-| **Views** | `views.py` — `ClientCreateView`, `ClientListView`, `ClientProfileView`, `ClientStatisticsView`, `ClientListCreateView` |
-| **URLs** | `urls.py` — `""` (list+create), `list/`, `register/`, `profile/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 2 test classes: `ClientWorkflowTests` (5 tests), `OnDemandRequestTests` (6 tests) |
-
-**Test Result:** All pass ✓
-
----
-
-## 4. collection_management
-
-**Directory:** `collection_management/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `CollectionRecord` (immutable audit log with payment, GPS, photos, segregation score) |
-| **Serializers** | `serializers.py` — `CollectionRecordSerializer`, `CollectionRecordCreateSerializer`, `CollectionRecordSummarySerializer` |
-| **Views** | `views.py` — `CollectionRecordViewSet` (ReadOnlyModelViewSet with `my_summary`, `my_records`, `update_record` actions) |
-| **URLs** | `urls.py` — DefaultRouter at root |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 2 test classes: `CollectionRecordTests` (4 tests), `CollectionRecordModelTests` (4 tests) |
-
-**Test Result:** All pass ✓
+| Issue | Details |
+|---|---|
+| **Duplicate URL aliases** | Both `/api/collector/` and `/api/collectors/` point to same views — adds confusion for API consumers. |
+| **`integration_tests.py` at root** | Not integrated into `make test` or test suite. |
+| **Transitional naming** | Some code uses `company_username` vs `company` FK, `created_at` vs `requested_at` — indicates incomplete refactoring. |
+| **`.env.example` incomplete** | Missing variables like `REDIS_URL`, `MTN_MOMO_WEBHOOK_SECRET`, `BIRD_API_KEY`. |
 
 ---
 
-## 5. collector
+## 📋 PRIORITY FIX LIST
 
-**Directory:** `collector/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Collector` (3 types: individual/business/company_driver, PostGIS service_area, live location), `CollectorRating` |
-| **Serializers** | `serializers.py` — `CollectorSerializer`, `CollectorCreateSerializer`, `CollectorListSerializer`, `CollectorUpdateSerializer` |
-| **Views** | `views.py` — `CollectorCreateView`, `CollectorListView`, `CollectorProfileView`, `CollectorsByCompanyView`, `CollectorsBySupervisorView`, `PrivateCollectorsListView`, `CollectorsByZoneView`, `CollectorApprovalView`, `CollectorListCreateView`, `LiveCollectorsView` |
-| **URLs** | `urls.py` — `register/`, `""` (list+create), `private/`, `company/<id>/`, `supervisor/<id>/`, `zone/`, `me/`, `<id>/approval/`, `live/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 3 test classes: `CollectorRegistrationTests` (2 tests), `CollectorWorkflowTests` (4 tests), `IncentivePenaltyTests` (6 tests) |
-| **Other** | `services.py` (IncentiveCalculator, PenaltyCalculator), `signals.py`, `tasks.py` |
-
-**Test Result:** All pass ✓
-
----
-
-## 6. notifications
-
-**Directory:** `notifications/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Notification` (SMS/email/push with retry, delivery tracking), `NotificationPreference` |
-| **Serializers** | `serializers.py` — `NotificationSerializer`, `NotificationPreferenceSerializer` |
-| **Views** | `views.py` — `NotificationViewSet` (unread, mark_read, mark_all_read), `NotificationPreferenceViewSet` (my_preferences, update_preferences) |
-| **URLs** | `urls.py` — DefaultRouter with `notifications/` and `preferences/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | None |
-| **Other** | `services.py`, `tasks.py` |
-
-**Test Result:** N/A (no tests) ✓
+| Priority | Fix | Effort |
+|---|---|---|
+| 🔴 **P1** | Fix `LiveCollectorsView` — replace `last_known_location` with lat/lng query | 30 min |
+| 🔴 **P1** | Fix Go bridge — use targeted `UPDATE ... WHERE user_id = ANY(...)` instead of resetting all | 2 hours |
+| 🔴 **P1** | Fix spatial distance — convert `Point.distance()` to use geography type | 1 hour |
+| 🔴 **P2** | Add encryption for `PaymentMethod.account_number` (or at minimum, add a warning if not encrypted) | 4 hours |
+| 🟡 **P3** | Write tests for `notifications` app | 1-2 days |
+| 🟡 **P3** | Add missing indexes on `last_known_latitude`, `last_known_longitude`, `last_location_updated_at`, `base_location`, `service_area` | 1 hour |
+| 🟡 **P3** | Configurable freshness cutoff for dispatch service | 30 min |
+| 🟡 **P3** | Fix duplicate waste type key mismatch in `pricing_calculator.py` | 30 min |
+| 🟡 **P3** | Add rate limiting on password reset endpoints | 1 hour |
+| 🟢 **P4** | Extract shared constants (waste colors, etc.) to single file | 30 min |
+| 🟢 **P4** | Switch frontend OSRM calls to backend proxy | 2 hours |
+| 🟢 **P4** | Add CI/CD pipeline | 1 day |
+| 🟢 **P4** | Remove or encrypt `accounts_credentials.json` | 10 min |
 
 ---
 
-## 7. on_demand
+## 🎯 OVERALL ASSESSMENT
 
-**Directory:** `on_demand/`
+**Status:** ✅ **Functioning but fragile — 7 critical bugs that will cause runtime failures in specific paths.**
 
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `OnDemandRequest` (one-time pickup, PostGIS PointField, pricing with zone+type multipliers) |
-| **Serializers** | `serializers.py` — `OnDemandRequestListSerializer`, `OnDemandRequestDetailSerializer`, `OnDemandRequestCreateSerializer`, `OnDemandRequestUpdateSerializer` (with GPS validation) |
-| **Views** | `views.py` — `OnDemandRequestViewSet` (ModelViewSet with assign/auto_assign/start/complete/accept/cancel + list_pending/list_today/list_by_collector/list_by_company + summary endpoints) |
-| **URLs** | `urls.py` — DefaultRouter |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 2 test classes: `OnDemandLifecycleTests` (5 tests), `OnDemandModelTests` (3 tests) |
-| **Other** | `services.py` (auto_assign_request), `pricing_calculator.py` |
+### Strengths:
+- Exceptionally well-documented and structured for a project of this scope.
+- Strong test coverage in critical financial modules (payment, wallet).
+- Sophisticated feature set (real-time WebSocket, spatial optimization, E2E encryption).
+- Security-aware defaults (JWT, HSTS, rate limiting, webhook verification).
 
-**Test Result:** All pass ✓
+### Weaknesses:
+- **Several bugs were introduced during refactoring** (renamed fields, moved locations, inconsistent types) — indicates need for integration tests on the live tracking and dispatch pathways.
+- **Geospatial queries are subtly broken** (degrees vs. meters) — can silently produce incorrect distances.
+- **Notification app is untested** despite being a critical user-facing feature.
+- **Race conditions in Go bridge and wallet concurrency** — could cause data loss in production under load.
 
----
+### Recommendation:
+1. Address the **7 critical bugs first** (they will crash or silently corrupt data).
+2. Write integration tests for the **live tracking end-to-end** (Go service → Redis → Django bridge → API → Frontend).
+3. Add **CI pipeline** to prevent regressions.
+4. Encrypt **sensitive stored data** (payment method account numbers).
+5. **Refactor spatial queries** to use `geography` type consistently.
 
-## 8. payment
-
-**Directory:** `payment/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `PaymentMethod`, `Payment` (with refund support), `PaymentWebhook` |
-| **Serializers** | `serializers.py` — `PaymentMethodSerializer`, `PaymentMethodCreateSerializer`, `PaymentSerializer`, `PaymentInitiateSerializer`, `PaymentWebhookSerializer` |
-| **Views** | `views.py` — `PaymentMethodViewSet` (CRUD + set_default), `PaymentViewSet` (initiate/history/details/verify), `WebhookViewSet` (momo_webhook/paystack_webhook), `GetBanksView`, `GetMobileMoneyProvidersView`, `CreateBankRecipientView`, `CreateMobileMoneyRecipientView`, `InitiateTransferView` |
-| **URLs** | `urls.py` — DefaultRouter (methods/, payments/, webhooks/) + banks/, momo-providers/, recipients/bank/, recipients/momo/, transfers/ |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — **Empty** (only pass statement) |
-| **Other** | `services.py` (PaymentService, PaystackService), `tasks.py` |
-
-**Test Result:** N/A (no real tests) ✓
-
----
-
-## 9. routes
-
-**Directory:** `routes/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Route` (company/zone/supervisor/collector assignments, completion tracking), `RouteStop` (links to OnDemandRequest or ScheduledRequest, PostGIS PointField) |
-| **Serializers** | `serializers.py` — `RouteStopSerializer`, `RouteSerializer` (nested stops, derived fields) |
-| **Views** | `views.py` — `RouteViewSet` (CRUD + start/complete/my_route_today/set_current_stop/summary_timebound), `RouteStopViewSet` (CRUD + start/complete/skip/fail with CollectionRecord creation) |
-| **URLs** | `urls.py` — DefaultRouter at root + route-stops/ |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 2 test classes: `RouteWorkflowTests` (3 tests), `RouteStopTests` (2 tests) |
-| **Other** | `services.py`, `signals.py`, `tasks.py` |
-
-**Test Result:** All pass ✓
-
----
-
-## 10. scheduled_request
-
-**Directory:** `scheduled_request/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `ScheduledRequest` (recurring/subscription-style, PostGIS PointField, auto-pricing) |
-| **Serializers** | `serializers.py` — `ScheduledRequestDetailSerializer`, `ScheduledRequestCreateSerializer`, `ScheduledRequestUpdateSerializer` |
-| **Views** | `views.py` — `ScheduledRequestViewSet` (ModelViewSet with assign/start/complete/cancel + list_pending/list_today/list_by_collector/list_by_company + summary endpoints) |
-| **URLs** | `urls.py` — DefaultRouter |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 2 test classes: `ScheduledRequestTests` (1 test), `ScheduledRequestModelTests` (4 tests) |
-
-**Test Result:** All pass ✓
-
----
-
-## 11. supervisor
-
-**Directory:** `supervisor/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Supervisor` (OneToOne to User, M2M assigned_zones, company FK, role_level, permission flags, reports_to self-FK) |
-| **Serializers** | `serializers.py` — `SupervisorSerializer`, `SupervisorCreateSerializer`, `SupervisorListSerializer`, `SupervisorUpdateSerializer` |
-| **Views** | `views.py` — `SupervisorCreateView`, `SupervisorListView`, `CompanySupervisorListView`, `SupervisorProfileView`, `CompanySupervisorDetailView` |
-| **URLs** | `urls.py` — `create/`, `list/`, `profile/`, `company/`, `company/<pk>/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 1 class: `SupervisorTests` (4 tests) |
-| **Other** | `admin.py` |
-
-**Test Result:** ❌ **FAILS** — All 4 tests fail with `TypeError: Supervisor() got unexpected keyword arguments: 'company_username'`. The `company_username` field was removed from the model but tests still reference it.
-
----
-
-## 12. wallet
-
-**Directory:** `wallet/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Wallet` (balance, pending credits/debits, credit/debit methods), `Transaction` (balance tracking), `WalletSettlement` |
-| **Serializers** | `serializers.py` — `WalletSerializer`, `TransactionSerializer`, `WalletTransferSerializer`, `WalletSettlementSerializer` |
-| **Views** | `views.py` — `WalletViewSet` (my_wallet/history/summary/transfer), `SettlementViewSet` (ReadOnly + summary) |
-| **URLs** | `urls.py` — DefaultRouter (wallets/, settlements/) |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — **Empty** (only pass statement) |
-| **Other** | `tasks.py` |
-
-**Test Result:** N/A (no real tests) ✓
-
----
-
-## 13. waste_management_company
-
-**Directory:** `waste_management_company/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Company` (OneToOne to User, RGD number, EPA/MMDA permits, M2M service_zones, commission_tier, fleet tracking) |
-| **Serializers** | `serializers.py` — `CompanySerializer`, `CompanyCreateSerializer` |
-| **Views** | `views.py` — `CompanyRegisterView`, `CompanyListView`, `CompanyProfileView`, `CompanyDashboardView`, `CompanyFleetView`, `CompanyBillingView` |
-| **URLs** | `urls.py` — `register/`, `profile/`, `list/`, `dashboard/`, `fleet/`, `billing/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 3 test classes: `CompanyWorkflowTests` (2 tests), `SupervisorWorkflowTests` (4 tests), `AutoAssignmentTests` (4 tests) |
-| **Other** | `accounts/` sub-dir |
-
-**Test Result:** ❌ **FAILS** — `SupervisorWorkflowTests.setUpTestData` fails with the same `company_username` error. 1 class-level error.
-
----
-
-## 14. zones
-
-**Directory:** `zones/`
-
-| Artifact | Files |
-|----------|-------|
-| **Models** | `models.py` — `Zone` (PostGIS Polygon boundary + Point center, zone_code, city/district/region, service_fee_multiplier, population_density) |
-| **Serializers** | `serializers.py` — `ZoneCreateSerializer`, `ZoneUpdateSerializer`, `ZoneListSerializer` (all GeoFeatureModelSerializer) |
-| **Views** | `views.py` — `ZoneCreateView`, `ZoneUpdateView`, `ZoneListView`, `ZoneDetailView`, `PointInZoneView` |
-| **URLs** | `urls.py` — `list/`, `create/`, `<id>/`, `<id>/update/`, `check-point/` |
-| **Templates** | None |
-| **Static Files** | None |
-| **Tests** | `tests.py` — 2 test classes: `ZoneTests` (3 tests), `PricingTests` (8 tests) |
-
-**Test Result:** All pass ✓
-
----
-
-## 15. Overall Test Status
-
-### Summary
-
-| Category | Count |
-|----------|-------|
-| **Total tests** | 65 |
-| **Passed** | 58 |
-| **Failed/Errored** | 7 |
-| **App test files** | 11 (out of 13 apps) |
-| **Apps with no tests** | notifications, payment, wallet |
-
-### Failed Tests (7 errors)
-
-All 7 errors share the same root cause:
-
-```
-TypeError: Supervisor() got unexpected keyword arguments: 'company_username'
-```
-
-The `company_username` field was removed from the `Supervisor` model (now uses `company` FK to `waste_management_company.Company`), but the following test files still reference it:
-
-| File | Affected Tests |
-|------|---------------|
-| `supervisor/tests.py` | `test_supervisor_profile_view` (line 99), `test_supervisor_profile_update` (line 121), `test_list_supervisors` (line 148) |
-| `waste_management_company/tests.py` | `SupervisorWorkflowTests.setUpTestData` (line 120) |
-| `on_demand/tests.py` | `OnDemandLifecycleTests.setUpTestData` (line 64) |
-| `routes/tests.py` | `RouteWorkflowTests.setUpTestData` (line 63), `RouteStopTests.setUpTestData` (line 236) |
-
-### Checklist
-
-- [x] **accounts** — 3 models (User, CustomUserManager), 3 serializers, 8 views, 6 URL routes, 9 tests ✓
-- [x] **borla_master** — Project config, URL routing, health check, no tests ✓
-- [x] **client** — 2 models (Client, ClientAddress), 6 serializers, 5 views, 4 URL routes, 11 tests ✓
-- [x] **collection_management** — 1 model (CollectionRecord), 3 serializers, 1 ViewSet, 1 URL, 8 tests ✓
-- [x] **collector** — 2 models (Collector, CollectorRating), 4 serializers, 10 views, 8 URL routes, 12 tests ✓
-- [x] **notifications** — 2 models (Notification, NotificationPreference), 2 serializers, 2 ViewSets, 1 URL, **0 tests**
-- [x] **on_demand** — 1 model (OnDemandRequest), 4 serializers, 1 ViewSet, 1 URL, 8 tests ✓
-- [x] **payment** — 3 models (PaymentMethod, Payment, PaymentWebhook), 5 serializers, 7 views, 6 URL routes, **0 tests** (empty file)
-- [x] **routes** — 2 models (Route, RouteStop), 2 serializers, 2 ViewSets, 1 URL, 5 tests ✓
-- [x] **scheduled_request** — 1 model (ScheduledRequest), 3 serializers, 1 ViewSet, 1 URL, 5 tests ✓
-- [x] **supervisor** — 1 model (Supervisor), 4 serializers, 5 views, 4 URL routes, **4 tests FAILING** ❌
-- [x] **wallet** — 3 models (Wallet, Transaction, WalletSettlement), 4 serializers, 2 ViewSets, 1 URL, **0 tests** (empty file)
-- [x] **waste_management_company** — 1 model (Company), 2 serializers, 6 views, 6 URL routes, **1 test FAILING** ❌
-- [x] **zones** — 1 model (Zone), 3 serializers, 5 views, 5 URL routes, 11 tests ✓
-- [x] **`python manage.py test`** — ❌ **FAILED** (65 tests, 7 errors — all from `company_username` issue)
-
-### Key Findings
-
-1. **3 apps have zero tests:** `notifications`, `payment`, `wallet` (their `tests.py` files are empty stubs)
-2. **7 tests fail** all from the same cause: `Supervisor.model` no longer has `company_username` field (replaced by `company` FK), but tests still pass it in `Supervisor.objects.create()`
-3. **Test count** is 65 total; no coverage for payment flows, wallet operations, or notification delivery
-4. **No templates or static files** are shipped within any Django app — the frontend is a separate React (Vite/TypeScript) app in `borla-frontend/`
-5. All autodiscovered tasks/signals/services files exist but their actual test coverage is unknown
+This project has a solid foundation and clearly skilled engineering behind it. The issues are mostly transitional artifacts of rapid development — fixing them will make it production-grade.
